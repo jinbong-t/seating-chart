@@ -41,7 +41,9 @@ export default function GridSetup({ gridConfig, setGridConfig, seats, setSeats }
     return {
       display: 'grid',
       gridTemplateColumns: `repeat(${gridConfig.cols}, minmax(0, 1fr))`,
-      gap: '0.5rem',
+      gridTemplateRows: `repeat(${gridConfig.rows}, minmax(0, 1fr))`,
+      gap: '0.3rem',
+      flex: 1,
     };
   };
 
@@ -103,22 +105,22 @@ export default function GridSetup({ gridConfig, setGridConfig, seats, setSeats }
         </div>
       </div>
 
-      <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-        <div className="flex justify-center mb-8">
-          <div className="w-1/2 py-3 bg-slate-100 rounded-xl border border-slate-300 text-center text-slate-500 font-semibold shadow-inner">
+      <div className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col" style={{ height: '260px' }}>
+        <div className="flex justify-center mb-2 shrink-0">
+          <div className="w-1/2 py-1.5 bg-slate-100 rounded-xl border border-slate-300 text-center text-slate-500 font-semibold shadow-inner text-xs">
             칠 판
           </div>
         </div>
         
-        <div className="max-w-3xl mx-auto" style={getGridStyle()}>
+        <div className="w-full" style={getGridStyle()}>
           {seats.map((seat) => (
             <button
               key={seat.id}
               onClick={() => toggleSeatStatus(seat.id)}
               className={`
-                aspect-square rounded-xl transition-all duration-300 flex items-center justify-center font-medium
-                ${seat.status === 'available' 
-                  ? 'bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-400 hover:scale-105 shadow-sm text-indigo-700' 
+                rounded-md transition-all duration-200 flex items-center justify-center font-medium text-xs
+                ${seat.status === 'available'
+                  ? 'bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-400 shadow-sm text-indigo-700'
                   : 'bg-slate-100 border-2 border-dashed border-slate-300 opacity-60 hover:opacity-100 text-slate-400'
                 }
               `}
@@ -131,3 +133,5 @@ export default function GridSetup({ gridConfig, setGridConfig, seats, setSeats }
     </div>
   );
 }
+
+

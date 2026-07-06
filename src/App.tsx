@@ -33,21 +33,18 @@ function App() {
         <div className="bg-white rounded-3xl shadow-xl border border-[#e5d9c5] p-6 md:p-8 mb-8">
           <div className="flex flex-col md:flex-row border-b-2 border-[#e5d9c5] mb-8">
             <TabButton 
-              id="students" 
               label="1. 명단 입력" 
               icon={<Users size={20} />} 
               isActive={activeTab === 'students'} 
               onClick={() => setActiveTab('students')} 
             />
             <TabButton 
-              id="grid" 
               label="2. 교실 설정" 
               icon={<Grid3X3 size={20} />} 
               isActive={activeTab === 'grid'} 
               onClick={() => setActiveTab('grid')} 
             />
             <TabButton 
-              id="placement" 
               label="3. 자리 뽑기" 
               icon={<Shuffle size={20} />} 
               isActive={activeTab === 'placement'} 
@@ -102,7 +99,7 @@ function App() {
   );
 }
 
-function TabButton({ id, label, icon, isActive, onClick }: { id: string, label: string, icon: React.ReactNode, isActive: boolean, onClick: () => void }) {
+function TabButton({ label, icon, isActive, onClick }: { label: string, icon: React.ReactNode, isActive: boolean, onClick: () => void }) {
   return (
     <button
       onClick={onClick}

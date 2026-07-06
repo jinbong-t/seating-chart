@@ -6,7 +6,7 @@ export interface Student {
   gender: Gender;
   isFixedFront: boolean; // 시력이 안 좋거나 특별한 이유로 앞자리 고정
   isFixedBack: boolean;  // 특별한 이유로 뒷자리 고정
-  separationGroup?: number; // 분리 배치해야 하는 학생들끼리 같은 그룹 번호 부여
+  separationGroup?: string; // 분리 배치해야 하는 학생들끼리 같은 그룹 이름/단어 부여
 }
 
 export type SeatStatus = 'available' | 'disabled' | 'occupied';

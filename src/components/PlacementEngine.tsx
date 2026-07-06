@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { Student, Seat, GridConfig } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shuffle, Download, Printer, Settings } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { Shuffle, Download, Printer, Settings, Eye, CheckCircle2 } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -13,12 +13,71 @@ interface Props {
 }
 
 type GenderMix = 'none' | 'boy-girl' | 'same-gender';
+type RevealMode = 'all' | 'one-by-one';
+
+const playPopSound = () => {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+    
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const playTadaSound = () => {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    const playNote = (freq: number, startTime: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.2, startTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+
+    const now = ctx.currentTime;
+    playNote(523.25, now, 0.4); 
+    playNote(659.25, now + 0.15, 0.4); 
+    playNote(783.99, now + 0.3, 0.6); 
+    playNote(1046.50, now + 0.3, 0.6); 
+  } catch (e) {
+    console.error(e);
+  }
+};
 
 export default function PlacementEngine({ students, seats, setSeats, gridConfig }: Props) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [genderMix, setGenderMix] = useState<GenderMix>('none');
+  const [revealMode, setRevealMode] = useState<RevealMode>('all');
+  const [isTeacherView, setIsTeacherView] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
+  const [revealedSeats, setRevealedSeats] = useState<string[]>([]);
 
   const getAvailableSeats = () => seats.filter(s => s.status === 'available');
 
@@ -34,7 +93,6 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
   const checkAdjacency = (seat: Seat, student: Student, currentSeats: Seat[]) => {
     if (!student.separationGroup) return false;
     
-    // 인접한 4방향 (상, 하, 좌, 우) 확인
     const adjacentDirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
     for (const [dr, dc] of adjacentDirs) {
       const r = seat.row + dr;
@@ -44,11 +102,38 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
       if (neighbor && neighbor.studentId) {
         const neighborStudent = students.find(s => s.id === neighbor.studentId);
         if (neighborStudent && neighborStudent.separationGroup === student.separationGroup) {
-          return true; // 인접 위치에 같은 그룹 학생이 있음 (충돌)
+          return true; 
         }
       }
     }
     return false;
+  };
+
+  const fireConfetti = () => {
+    playTadaSound();
+    const duration = 2 * 1000;
+    const end = Date.now() + duration;
+
+    (function frame() {
+      confetti({
+        particleCount: 5,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
+      });
+      confetti({
+        particleCount: 5,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
+      });
+
+      if (Date.now() < end) {
+        requestAnimationFrame(frame);
+      }
+    }());
   };
 
   const handlePlacement = () => {
@@ -61,6 +146,9 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
     setErrorMsg('');
     setIsAnimating(true);
     setIsCompleted(false);
+    setRevealedSeats([]);
+
+    playPopSound();
 
     let newSeats = seats.map(s => s.status === 'occupied' ? { ...s, status: 'available' as const, studentId: undefined } : s);
     
@@ -84,17 +172,14 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
       sortedSeats = sortedSeats.filter(s => s.id !== targetSeatId);
     };
 
-    // 1. 앞자리 고정 배치
     frontStudents.forEach(student => {
       if (sortedSeats.length > 0) assignSeat(student, sortedSeats[0].id);
     });
 
-    // 2. 뒷자리 고정 배치
     backStudents.forEach(student => {
       if (sortedSeats.length > 0) assignSeat(student, sortedSeats[sortedSeats.length - 1].id);
     });
 
-    // 남은 학생 배치 (단순 성별 섞기 유도)
     if (genderMix === 'boy-girl') {
       let boys = normalStudents.filter(s => s.gender === 'male');
       let girls = normalStudents.filter(s => s.gender === 'female');
@@ -109,20 +194,16 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
       normalStudents = combined;
     }
 
-    // 3. 남은 학생 분리 규칙 적용하여 배치
     normalStudents.forEach(student => {
       if (sortedSeats.length === 0) return;
 
-      // 분리 그룹이 있는 경우, 가능한 한 충돌이 없는 자리를 찾음
       if (student.separationGroup) {
-        // 충돌 없는 자리 찾기 (랜덤하게 섞어서 먼저 나오는 것)
         const candidates = shuffleArray([...sortedSeats]);
         let selectedSeat = candidates.find(seat => !checkAdjacency(seat, student, newSeats));
         
         if (selectedSeat) {
           assignSeat(student, selectedSeat.id);
         } else {
-          // 어쩔 수 없이 충돌하는 자리라도 배치
           assignSeat(student, sortedSeats[Math.floor(Math.random() * sortedSeats.length)].id);
         }
       } else {
@@ -130,54 +211,66 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
       }
     });
 
-    // 애니메이션 후 폭죽
     setTimeout(() => {
       setSeats(newSeats);
       setIsAnimating(false);
       setIsCompleted(true);
       
-      const duration = 2 * 1000;
-      const end = Date.now() + duration;
+      if (revealMode === 'all') {
+        setRevealedSeats(newSeats.map(s => s.id));
+        fireConfetti();
+      } else {
+        playPopSound();
+      }
+    }, 1500);
+  };
 
-      (function frame() {
-        confetti({
-          particleCount: 5,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0 },
-          colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
-        });
-        confetti({
-          particleCount: 5,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1 },
-          colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
-        });
+  const handleSeatClick = (seatId: string) => {
+    if (revealMode === 'one-by-one' && isCompleted && !revealedSeats.includes(seatId)) {
+      playPopSound();
+      setRevealedSeats(prev => [...prev, seatId]);
+    }
+  };
 
-        if (Date.now() < end) {
-          requestAnimationFrame(frame);
-        }
-      }());
-    }, 1200);
+  const revealAllCards = () => {
+    setRevealedSeats(seats.map(s => s.id));
+    fireConfetti();
   };
 
   const getGridStyle = () => {
     return {
       display: 'grid',
       gridTemplateColumns: `repeat(${gridConfig.cols}, minmax(0, 1fr))`,
+      gridTemplateRows: `repeat(${gridConfig.rows}, minmax(0, 1fr))`,
       gap: '0.75rem',
+      height: '100%'
     };
   };
 
   const saveAsImage = async () => {
-    const el = document.getElementById('seating-chart-result');
-    if (el) {
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#1e293b' }); // 칠판 배경색상 맞춰서 캡처
-      const link = document.createElement('a');
-      link.download = '자리배치표.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+    try {
+      const el = document.getElementById('seating-chart-result');
+      if (el) {
+        const oldRevealed = [...revealedSeats];
+        setRevealedSeats(seats.map(s => s.id));
+        
+        setTimeout(async () => {
+          const dataUrl = await toPng(el, { 
+            quality: 1, 
+            backgroundColor: '#f8fafc',
+            pixelRatio: 2
+          });
+          const link = document.createElement('a');
+          link.download = '자리배치표.png';
+          link.href = dataUrl;
+          link.click();
+          
+          setRevealedSeats(oldRevealed);
+        }, 300);
+      }
+    } catch (error) {
+      console.error('이미지 저장 중 오류 발생:', error);
+      alert('이미지를 저장하는 중 오류가 발생했습니다. 브라우저의 인쇄 기능(PDF로 저장)을 대신 이용해 주세요.');
     }
   };
 
@@ -187,121 +280,191 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="bg-[#fdfbf7] p-6 rounded-2xl border-2 border-[#e5d9c5] flex flex-col md:flex-row gap-6 justify-between items-center shadow-sm">
-        <div className="flex flex-col gap-2 w-full md:w-auto">
-          <label className="text-sm font-bold text-amber-900 flex items-center gap-1">
-            <Settings size={16} /> 짝꿍 규칙 (선택)
-          </label>
-          <select 
-            value={genderMix}
-            onChange={(e) => setGenderMix(e.target.value as GenderMix)}
-            className="px-4 py-2 rounded-xl border-2 border-[#e5d9c5] focus:border-amber-500 focus:ring-0 focus:outline-none bg-white text-amber-900 font-medium"
-          >
-            <option value="none">조건 없음 (완전 랜덤)</option>
-            <option value="boy-girl">남녀 섞어 앉기 유도</option>
-          </select>
+      {/* 깔끔한 모던 설정 패널 */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-6 justify-between shadow-sm">
+        <div className="flex flex-col gap-5 w-full">
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex flex-col gap-2 w-full lg:w-1/2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                <Settings size={16} /> 짝꿍 규칙 (선택)
+              </label>
+              <select 
+                value={genderMix}
+                onChange={(e) => setGenderMix(e.target.value as GenderMix)}
+                className="px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-slate-50 text-slate-800 font-medium w-full transition-colors cursor-pointer"
+              >
+                <option value="none">조건 없음 (랜덤)</option>
+                <option value="boy-girl">남녀 섞어 앉기 유도</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2 w-full lg:w-1/2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                <Eye size={16} /> 공개 모드 (선택)
+              </label>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setRevealMode('all')}
+                  className={`flex-1 py-3 px-3 rounded-xl border font-semibold transition-all whitespace-nowrap text-sm sm:text-base ${revealMode === 'all' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                >
+                  전체 공개
+                </button>
+                <button 
+                  onClick={() => setRevealMode('one-by-one')}
+                  className={`flex-1 py-3 px-3 rounded-xl border font-semibold transition-all whitespace-nowrap text-sm sm:text-base ${revealMode === 'one-by-one' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                >
+                  하나씩 뒤집기
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={handlePlacement}
-          disabled={isAnimating || students.length === 0}
-          className={`flex-1 md:flex-none py-4 px-10 rounded-2xl font-black text-xl text-white shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 border-4 border-amber-600/30
-            ${isAnimating ? 'bg-amber-400 cursor-not-allowed animate-pulse' : 'bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 shadow-amber-500/30 text-amber-950'}`}
-        >
-          <Shuffle size={28} className={isAnimating ? 'animate-spin' : ''} />
-          {isAnimating ? '배치 중...' : '자리 뽑기 시작!'}
-        </button>
+        <div className="flex items-end w-full md:w-auto">
+          <button
+            onClick={handlePlacement}
+            disabled={isAnimating || students.length === 0}
+            className={`w-full md:w-auto min-w-[180px] py-4 px-6 rounded-xl font-bold text-lg text-white transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 whitespace-nowrap
+              ${isAnimating ? 'bg-indigo-400 cursor-not-allowed opacity-80' : 'bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/20'}`}
+          >
+            <Shuffle size={24} className={isAnimating ? 'animate-spin' : ''} />
+            {isAnimating ? '배치 중...' : '자리 뽑기 시작!'}
+          </button>
+        </div>
       </div>
 
       {errorMsg && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 font-medium text-center">
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 font-medium text-center">
           {errorMsg}
         </div>
       )}
 
-      {/* 칠판 테마 결과 화면 */}
-      <div className="bg-[#1e293b] p-6 md:p-10 rounded-[2rem] border-[12px] border-[#8b5a2b] shadow-2xl overflow-x-auto relative min-h-[600px]" id="seating-chart-result">
+      {/* 깔끔한 모던 결과 화면 (한 화면에 다 들어가도록 수정) */}
+      <div className="bg-slate-50 p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-inner flex flex-col h-[85vh] min-h-[600px] relative" id="seating-chart-result">
         
-        {/* 분필 가루 질감 효과를 위한 오버레이 */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
-
-        <div className="flex justify-between items-center mb-10 no-print relative z-10">
-          <h3 className="font-black text-2xl text-white drop-shadow-md font-['Comic_Sans_MS',sans-serif]">🧑‍🏫 우리 반 자리 배치표</h3>
-          <div className="flex gap-3">
-            <button onClick={saveAsImage} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm transition-colors border border-white/20" title="이미지로 저장">
+        <div className="flex justify-between items-center mb-6 no-print relative z-10 shrink-0">
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-2xl text-slate-800 tracking-tight">자리 배치표</h3>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsTeacherView(!isTeacherView)} 
+              className={`px-4 py-2 font-semibold rounded-lg border transition-colors flex items-center gap-2 whitespace-nowrap ${isTeacherView ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              title="교탁 위치를 반대로 뒤집어 선생님이 보는 방향으로 바꿉니다."
+            >
+              <Eye size={18} />
+              {isTeacherView ? '선생님 시점' : '학생 시점'}
+            </button>
+            {revealMode === 'one-by-one' && isCompleted && revealedSeats.length < seats.length && (
+              <button onClick={revealAllCards} className="px-4 py-2 font-semibold rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200 transition-colors flex items-center gap-2 whitespace-nowrap">
+                <CheckCircle2 size={18} />
+                전체 뒤집기
+              </button>
+            )}
+            <button onClick={saveAsImage} className="p-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition-all shadow-sm" title="이미지로 저장">
               <Download size={20} />
             </button>
-            <button onClick={printChart} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm transition-colors border border-white/20" title="인쇄">
+            <button onClick={printChart} className="p-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition-all shadow-sm" title="인쇄">
               <Printer size={20} />
             </button>
           </div>
         </div>
 
-        <div className="flex justify-center mb-14 relative z-10">
-          <div className="w-2/3 py-5 bg-[#334155]/80 backdrop-blur-md rounded-2xl border-b-4 border-[#0f172a] text-center text-white/90 font-black text-3xl shadow-lg tracking-widest">
-            교 탁
+        {/* 학생 시점 교탁 (위) */}
+        {!isTeacherView && (
+          <div className="flex justify-center mb-6 relative z-10 shrink-0">
+            <div className="w-1/2 md:w-1/3 py-3 bg-slate-800 rounded-xl shadow-md text-center text-white font-bold text-xl tracking-widest">
+              교 탁
+            </div>
           </div>
-        </div>
+        )}
         
-        <div className="max-w-5xl mx-auto relative z-10" style={getGridStyle()}>
+        {/* 그리드 영역 */}
+        <div className="w-full relative z-10 flex-1 min-h-0" style={getGridStyle()}>
           <AnimatePresence>
-            {seats.map((seat) => {
+            {(isTeacherView ? [...seats].reverse() : seats).map((seat) => {
               const student = students.find(s => s.id === seat.studentId);
               const isOccupied = seat.status === 'occupied' && student;
+              const isRevealed = revealedSeats.includes(seat.id);
 
               if (seat.status === 'disabled') {
                 return (
-                  <div key={seat.id} className="aspect-[4/3] rounded-2xl border-4 border-dashed border-white/10 flex items-center justify-center opacity-20">
+                  <div key={seat.id} className="w-full h-full rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center opacity-50">
                   </div>
                 );
               }
 
               return (
-                <motion.div
-                  key={seat.id}
-                  layout
-                  initial={isAnimating ? { opacity: 0, scale: 0.5, rotateY: 90 } : false}
-                  animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-                  transition={{ type: "spring", stiffness: 100, damping: 12, delay: isAnimating ? Math.random() * 0.5 : 0 }}
-                  className={`
-                    relative aspect-[4/3] rounded-2xl flex flex-col items-center justify-center shadow-[0_8px_0_0_rgba(0,0,0,0.2)] border-2
-                    ${isOccupied 
-                      ? 'bg-[#eecda3] bg-gradient-to-br from-[#efd5ff] to-[#eecda3] border-[#d4a373] text-[#5c4033]' // 나무 질감 느낌의 그라데이션
-                      : 'bg-white/5 border-white/10 text-white/30 backdrop-blur-sm'
-                    }
-                    transform transition-transform hover:-translate-y-1 hover:shadow-[0_12px_0_0_rgba(0,0,0,0.2)]
-                  `}
-                >
-                  {isOccupied ? (
-                    <>
-                      {/* 카드 상단 장식물 (압정 느낌) */}
-                      <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-red-400 shadow-sm border border-red-500/50"></div>
-                      
-                      <span className="font-black text-2xl md:text-3xl drop-shadow-sm">{student.name}</span>
-                      
-                      <div className="flex gap-1 mt-2">
-                        {student.gender === 'male' && <span className="w-2 h-2 rounded-full bg-blue-500"></span>}
-                        {student.gender === 'female' && <span className="w-2 h-2 rounded-full bg-pink-500"></span>}
-                        {student.separationGroup && (
-                          <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold border border-red-200">
-                            G{student.separationGroup}
-                          </span>
-                        )}
+                <div key={seat.id} className="relative w-full h-full" style={{ perspective: 1000 }}>
+                  <motion.div
+                    layout
+                    initial={isAnimating ? { opacity: 0, scale: 0.8, y: -20 } : false}
+                    animate={{ 
+                      opacity: 1, 
+                      scale: 1, 
+                      y: 0,
+                      rotateY: isRevealed ? 0 : 180 
+                    }}
+                    transition={{ 
+                      type: "spring", 
+                      stiffness: 260, 
+                      damping: 20, 
+                      delay: isAnimating ? Math.random() * 0.2 : 0 
+                    }}
+                    onClick={() => handleSeatClick(seat.id)}
+                    className="w-full h-full preserve-3d cursor-pointer"
+                    style={{ transformStyle: 'preserve-3d' }}
+                  >
+                    {/* 카드 뒷면 (프리미엄 패턴 무늬) */}
+                    <div 
+                      className={`absolute inset-0 rounded-xl flex flex-col items-center justify-center shadow-sm border border-slate-400 backface-hidden ${!isRevealed ? 'pointer-events-auto hover:-translate-y-1 hover:shadow-md transition-all' : 'pointer-events-none'}`}
+                      style={{ 
+                        backfaceVisibility: 'hidden', 
+                        transform: 'rotateY(180deg)',
+                        backgroundColor: '#334155',
+                        backgroundImage: 'repeating-linear-gradient(45deg, #1e293b 25%, transparent 25%, transparent 75%, #1e293b 75%, #1e293b), repeating-linear-gradient(45deg, #1e293b 25%, #334155 25%, #334155 75%, #1e293b 75%, #1e293b)',
+                        backgroundPosition: '0 0, 10px 10px',
+                        backgroundSize: '20px 20px'
+                      }}
+                    >
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-800 border border-slate-500 rounded-full flex items-center justify-center shadow-inner z-10">
+                        <span className="text-lg sm:text-xl font-black text-slate-300">?</span>
                       </div>
-                      
-                      <span className="text-xs font-bold opacity-60 mt-1 absolute bottom-2">
-                        {student.isFixedFront && '🌟 앞자리'}
-                        {student.isFixedBack && '🌟 뒷자리'}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-sm font-medium">빈 자리</span>
-                  )}
-                </motion.div>
+                    </div>
+
+                    {/* 카드 앞면 (깔끔한 이름표) */}
+                    <div 
+                      className={`absolute inset-0 rounded-xl flex flex-col items-center justify-center shadow-sm border border-slate-200 backface-hidden p-1 sm:p-2
+                        ${isOccupied 
+                          ? 'bg-white' 
+                          : 'bg-slate-100 text-slate-400'
+                        }
+                      `}
+                      style={{ backfaceVisibility: 'hidden', transform: 'rotateY(0deg)' }}
+                    >
+                      {isOccupied ? (
+                        <span className="font-bold text-[clamp(1rem,2vw,2rem)] text-slate-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">
+                          {student.name}
+                        </span>
+                      ) : (
+                        <span className="text-xs sm:text-sm font-medium">빈 자리</span>
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
               );
             })}
           </AnimatePresence>
         </div>
+
+        {/* 선생님 시점 교탁 (아래) */}
+        {isTeacherView && (
+          <div className="flex justify-center mt-6 relative z-10 shrink-0">
+            <div className="w-1/2 md:w-1/3 py-3 bg-slate-800 rounded-xl shadow-md text-center text-white font-bold text-xl tracking-widest">
+              교 탁
+            </div>
+          </div>
+        )}
       </div>
       
       <style>{`
@@ -322,16 +485,6 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
           }
           .no-print {
             display: none !important;
-          }
-          /* 인쇄 시 어두운 테마 반전 처리 */
-          #seating-chart-result h3, #seating-chart-result .text-white {
-            color: black !important;
-            text-shadow: none !important;
-          }
-          #seating-chart-result .bg-\\[\\#334155\\]\\/80 {
-            background-color: #f1f5f9 !important;
-            color: #334155 !important;
-            border-color: #cbd5e1 !important;
           }
         }
       `}</style>

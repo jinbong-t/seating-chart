@@ -206,16 +206,13 @@ export default function StudentList({ students, setStudents }: Props) {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500 font-medium">그룹:</span>
                         <input
-                          type="number"
-                          min="1"
-                          max="9"
+                          type="text"
                           value={student.separationGroup || ''}
-                          onChange={(e) => updateStudent(student.id, { separationGroup: e.target.value ? parseInt(e.target.value) : undefined })}
-                          placeholder="번호"
-                          className="w-16 px-2 py-1 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-red-400 focus:outline-none"
-                          title="같은 숫자를 입력한 학생들끼리는 상하좌우로 붙어 앉지 않습니다."
+                          onChange={(e) => updateStudent(student.id, { separationGroup: e.target.value.trim() || undefined })}
+                          placeholder="분리 그룹명 (예: 떠드는애들)"
+                          className="w-full min-w-[120px] px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 focus:outline-none transition-shadow"
+                          title="같은 단어를 입력한 학생들끼리는 상하좌우로 붙어 앉지 않습니다."
                         />
                       </div>
                     </td>

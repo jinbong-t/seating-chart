@@ -1,32 +1,134 @@
-# React + TypeScript + Vite
+# 🎲 우당탕탕 자리뽑기! — 스마트 자리 배치 시스템
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> 우리 반 맞춤형 자리 배치를 단 몇 번의 클릭으로! 선생님들을 위한 무료 웹 앱입니다.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ 이런 분들께 추천해요
 
-## React Compiler
+- 매번 자리 배치 때마다 손으로 뽑기가 번거로운 선생님
+- 앞자리·뒷자리 고정이 필요한 학생이 있는 반
+- 특정 학생들을 떼어놓고 싶은 선생님
+- 남녀 섞어 앉히고 싶을 때
+- 빈 자리(기둥, 교탁 앞 등)가 있는 교실
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🖥️ 사용 방법
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+### 1단계 — 학생 명단 입력
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+![1단계 명단 입력](https://i.imgur.com/placeholder.png)
+
+**직접 입력:**
+1. 상단 입력창에 학생 이름을 입력합니다.
+2. `+ 추가` 버튼 또는 **Enter** 키를 누릅니다.
+3. 학생별 성별, 자리 고정 여부, 분리 그룹을 설정합니다.
+
+**엑셀 파일 업로드:**
+1. `양식 다운` 버튼으로 엑셀 양식을 내려받습니다.
+2. A열에 **이름**, B열에 **성별** (남/여) 을 입력합니다.
+3. `업로드` 버튼으로 파일을 불러옵니다.
+
+**학생별 옵션 설명:**
+
+| 옵션 | 설명 |
+|------|------|
+| 성별 | 남학생 / 여학생 / 선택안함 |
+| 앞자리 고정 | 항상 앞줄에 배치됩니다 (예: 시력이 약한 학생) |
+| 뒷자리 고정 | 항상 뒷줄에 배치됩니다 |
+| 분리 그룹 | 같은 단어를 입력한 학생끼리는 옆·앞뒤 자리에 앉지 않습니다 |
+
+> 💡 **분리 그룹 활용 팁:** 떼어놓고 싶은 학생 두 명에게 같은 단어(예: `A조`)를 입력하면 자동으로 인접하지 않게 배치됩니다!
+
+---
+
+### 2단계 — 교실 구조 설정
+
+1. **가로 칸 수**와 **세로 줄 수**를 입력해 교실 크기를 설정합니다.
+2. 아래 자리 배치표에서 **학생이 앉지 않는 자리**(기둥, 교탁 앞 등)를 클릭하면 `빈자리(X)`로 전환됩니다.
+3. 다시 클릭하면 `사용 가능`으로 돌아옵니다.
+
+> ⚠️ 사용 가능한 자리 수가 학생 수보다 많아야 합니다!
+
+---
+
+### 3단계 — 자리 뽑기
+
+**짝꿍 규칙 선택:**
+- `조건 없음 (랜덤)` — 완전 랜덤 배치
+- `남녀 섞어 앉기 유도` — 남학생·여학생이 최대한 번갈아 앉도록 배치
+
+**공개 모드 선택:**
+- `전체 공개` — 뽑기 완료 후 모든 자리를 한 번에 공개 🎊
+- `하나씩 뒤집기` — 학생이 자기 자리를 직접 클릭해서 확인 (더 재밌어요!)
+
+**`자리 뽑기 시작!` 버튼을 누르면:**
+- 배치 알고리즘이 조건에 맞게 자동으로 자리를 배정합니다
+- 완료 시 폭죽 🎉 & 효과음으로 즐거운 분위기 연출!
+
+**결과 화면 버튼:**
+
+| 버튼 | 기능 |
+|------|------|
+| 학생 시점 / 선생님 시점 | 교탁을 기준으로 방향을 뒤집어 봅니다 |
+| 전체 뒤집기 | 하나씩 뒤집기 모드에서 남은 자리를 한 번에 공개 |
+| ↓ (다운로드) | 자리 배치표를 이미지(PNG)로 저장 |
+| 🖨️ (인쇄) | 자리 배치표를 인쇄합니다 |
+
+---
+
+## 🔧 배치 알고리즘 설명
+
+```
+1. 앞자리 고정 학생 → 맨 앞줄부터 차례로 배치
+2. 뒷자리 고정 학생 → 맨 뒷줄부터 차례로 배치
+3. 나머지 학생 → 남녀 규칙 적용 후 랜덤 배치
+   - 분리 그룹이 있는 학생은 같은 그룹 학생과 인접하지 않는 자리 우선 탐색
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+## ❓ 자주 묻는 질문
+
+**Q. 설치가 필요한가요?**  
+A. 아니요! 웹 브라우저만 있으면 바로 사용할 수 있어요.
+
+**Q. 학생 명단이 저장되나요?**  
+A. 현재 버전은 브라우저 세션 내에서만 유지되고, 새로고침하면 초기화됩니다. 명단은 엑셀로 만들어두면 매번 업로드해서 쓸 수 있어요!
+
+**Q. 학생이 자리보다 많으면 어떻게 되나요?**  
+A. 오류 메시지가 표시됩니다. 교실 크기를 늘리거나 빈자리 수를 줄여주세요.
+
+**Q. 분리 그룹 조건을 지킬 수 없는 경우는요?**  
+A. 자리 수가 부족해 조건을 만족하는 자리가 없을 때는 최선의 자리에 배치됩니다.
+
+---
+
+## 🛠️ 기술 스택
+
+- **Frontend:** React 19 + TypeScript
+- **Build:** Vite
+- **Styling:** Tailwind CSS
+- **애니메이션:** Framer Motion
+- **엑셀 처리:** SheetJS (xlsx)
+- **이미지 저장:** html-to-image
+- **효과:** canvas-confetti
+
+---
+
+## 📝 업데이트 이력
+
+| 버전 | 내용 |
+|------|------|
+| v1.0 | 기본 자리 배치 기능 |
+| v1.1 | 학생 분리 배치 조건 및 칠판 테마 디자인 적용 |
+| v1.2 | 카드 뒤집기 애니메이션, 선생님 시점 기능 추가 |
+| v1.3 | 교실 설정 그리드 최적화 (한 화면에 맞게 개선) |
+
+---
+
+## 🙏 만든이
+
+우신중학교 교사 | 바이브코딩 프로젝트  
+문의 및 피드백은 댓글로 남겨주세요! 😊

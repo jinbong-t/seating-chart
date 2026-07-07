@@ -274,8 +274,58 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
     }
   };
 
-  const printChart = () => {
-    window.print();
+  const printChart = async () => {
+    const el = document.getElementById('seating-chart-result');
+    if (!el) return;
+
+    // 인쇄 전에 모든 카드 공개
+    const oldRevealed = [...revealedSeats];
+    setRevealedSeats(seats.map(s => s.id));
+    await new Promise(r => setTimeout(r, 350));
+
+    try {
+      const dataUrl = await toPng(el, {
+        quality: 1,
+        backgroundColor: '#ffffff',
+        pixelRatio: 1.5,
+      });
+
+      // 새 창에서 이미지로 인쇄 (한 장 보장)
+      const w = window.open('', '_blank', 'width=900,height=650');
+      if (!w) {
+        alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.');
+        setRevealedSeats(oldRevealed);
+        return;
+      }
+      w.document.write(`<!DOCTYPE html><html><head>
+        <title>자리 배치표</title>
+        <style>
+          @page { size: A4 landscape; margin: 5mm; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100vh;
+          }
+          img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+          }
+        </style>
+      </head><body>
+        <img src="${dataUrl}" onload="window.print(); window.close();" />
+      </body></html>`);
+      w.document.close();
+    } catch (e) {
+      console.error('인쇄 오류:', e);
+      window.print();
+    } finally {
+      setTimeout(() => setRevealedSeats(oldRevealed), 700);
+    }
   };
 
   // 단일 카드 색상 (심플하게 하나로 통일)
@@ -601,20 +651,52 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
       </div>
       
       <style>{`
+        @page {
+          size: A4 landscape;
+          margin: 5mm;
+        }
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          #seating-chart-result, #seating-chart-result * {
-            visibility: visible;
-          }
-          #seating-chart-result {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            border: none;
+          /* 모든 요소 숨기기 */
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden !important;
             background: white !important;
+          }
+          body > * {
+            display: none !important;
+          }
+          /* 오직 #root 안의 포커스 요소만 표시 */
+          body > #root {
+            display: block !important;
+          }
+          /* 자리 배치표 영역만 보이게 */
+          #seating-chart-result {
+            display: flex !important;
+            flex-direction: column !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 10px !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: white !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            /* 내용이 넘치면 페이지에 맞게 축소 */
+            zoom: 1;
+          }
+          /* 그리드 컨테이너 - 렬더 포진 콨 */
+          #seating-chart-result > div.w-full.flex-1 {
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
           }
           .no-print {
             display: none !important;

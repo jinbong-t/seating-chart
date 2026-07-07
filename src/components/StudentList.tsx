@@ -95,7 +95,7 @@ export default function StudentList({ students, setStudents }: Props) {
             placeholder="학생 이름 입력 후 Enter ↩"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 text-slate-700 font-medium"
+            className="flex-1 min-w-0 px-3 sm:px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 text-slate-700 font-medium text-sm sm:text-base"
             style={{
               borderColor: '#fed7aa',
               background: 'rgba(255,255,255,0.9)',
@@ -104,9 +104,9 @@ export default function StudentList({ students, setStudents }: Props) {
           />
           <button
             type="submit"
-            className="btn-primary flex items-center gap-2 px-5 py-3 whitespace-nowrap"
+            className="btn-primary flex items-center justify-center gap-1.5 px-4 sm:px-5 py-3 whitespace-nowrap shrink-0"
           >
-            <Plus size={18} /> 추가
+            <Plus size={18} /> <span className="hidden sm:inline">추가</span>
           </button>
         </form>
 

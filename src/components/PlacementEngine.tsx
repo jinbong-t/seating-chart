@@ -608,10 +608,10 @@ export default function PlacementEngine({ students, seats, setSeats, gridConfig 
                               WebkitBoxOrient: 'vertical',
                               // 모바일 5열 기준 카드 너비에 맞게 크다임 최소값 줄임
                               fontSize: 'clamp(0.45rem, 2.5vw, 0.95rem)',
-                              // 한국어는 음절 단위, 영어는 단어 단위로 줄바꾸어 자연스럽게
-                              wordBreak: 'normal',
-                              overflowWrap: 'anywhere',
-                              wordSpacing: '-0.05em',
+                              // 단어 중간에서 끊기지 않도록 강력 유지
+                              wordBreak: 'keep-all',
+                              overflowWrap: 'break-word',
+                              whiteSpace: 'pre-wrap',
                             } as React.CSSProperties}
                           >
                             {student.name}
